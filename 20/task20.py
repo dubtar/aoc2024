@@ -55,7 +55,6 @@ def main(f: TextIOWrapper, *, max_jump: int, min_gain: int, verbose: bool = Fals
             print(f'{k}: {v}')  # noqa: T201
     return sum(results.values())
 
-
 with Path(__file__).with_name('test.txt').open() as f:
     print('Test: 44 == ', main(f, max_jump=2, min_gain=2, verbose=True))  # noqa: T201
 
