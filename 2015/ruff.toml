@@ -1,0 +1,6 @@
+[lint]
+ignore = ["S101", "PLR2004"]
+
+[format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
