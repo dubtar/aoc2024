@@ -29,7 +29,7 @@ with input_file.open() as f:
     print(solve1(f.read()))
     solve1_time = time() - start
 
-assert solve2(test_input, True) == 3121910778619
+assert solve2(test_input, True) == test2_result
 with input_file.open() as f:
     start = time()
     print(solve2(f.read()))
