@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
+from functools import cache
 import pathlib
 from time import time
-from typing import Any
 
 test_input = """aaa: you hhh
 you: bbb ccc
@@ -77,51 +77,69 @@ def solve2_naive(inp: str, debug: bool = False) -> int:
             
     return result 
 
-def _find_paths(net: dict[str, list[str]], start: str, end: str, skip: set[str] = None) -> (int, set[str]):
-    if skip is None:
-        skip = set()
-    queue = deque()
-    queue.append((start, 0))
-    result = 0
-    visited = set()
-    max_length = 0
-    while queue:
-        name, length = queue.popleft()
-        if name == end:
-            result += 1
-            max_length = max(max_length, length)
-        for dep in net.get(name, []):
-            if dep in skip:
-                continue
-            visited.add(dep)
-            queue.append((dep, length + 1))
-    return result, visited
-
-def solve2(inp: str, debug: bool = False) -> int:
+def solve2_llm1(inp: str, debug: bool = False) -> int:
     net = _read_net(inp)
-    paths = defaultdict[Any, int](int)
-    for name, deps in net.items():
-        for dep in deps:
-            paths[dep] += 1
     
-    print(f'paths: fft: {paths["fft"]}, dac: {paths["dac"]}, out: {paths["out"]}', flush=True)
-
+    # Обратный граф для поиска путей "вверх" к svr
     reversed_net = defaultdict(list)
     for name, deps in net.items():
         for dep in deps:
             reversed_net[dep].append(name)
     
-
-    fft_to_svr  = _find_paths(reversed_net, 'fft', 'svr')
-    print(f'fft_to_svr: {fft_to_svr[0]}', flush=True)
-
-    dac_to_out = _find_paths(net, 'dac', 'out')
-    print(f'dac_to_out: {dac_to_out[0]}', flush=True)
+    @cache
+    def count_paths_to_svr(node: str) -> int:
+        if node == 'svr':
+            return 1
+        if node not in reversed_net:
+            return 0
+        return sum(count_paths_to_svr(parent) for parent in reversed_net[node])
     
+    svr_to_fft = count_paths_to_svr('fft')
 
-    fft_to_dac = _find_paths(net, 'fft', 'dac', dac_to_out[1])
-    print(f'fft_to_dac: {fft_to_dac}')
-    return fft_to_svr[0] * fft_to_dac[0] * dac_to_out[0]
+    # Для fft->dac: пути, не заходящие в out до dac
+    @cache  
+    def count_paths_fft_to_dac(node: str) -> int:
+        if node == 'dac':
+            return 1
+        if node == 'out' or node not in net:
+            return 0
+        return sum(count_paths_fft_to_dac(dep) for dep in net[node])
+    
+    fft_to_dac = count_paths_fft_to_dac('fft')
+
+    # Мемоизированный подсчёт путей от node до out
+    @cache
+    def count_paths_to_out(node: str) -> int:
+        if node == 'out':
+            return 1
+        if node not in net:
+            return 0
+        return sum(count_paths_to_out(dep) for dep in net[node])
+    
+    dac_to_out = count_paths_to_out('dac')
+    
+    if debug:
+        print(f'svr_to_fft: {svr_to_fft}, fft_to_dac: {fft_to_dac}, dac_to_out: {dac_to_out}')
+    
+    return svr_to_fft * fft_to_dac * dac_to_out
+
+def solve2(inp: str, debug: bool = False) -> int:
+    net = _read_net(inp)
+    
+    @cache
+    def count_paths(node: str, has_fft: bool, has_dac: bool) -> int:
+        # Обновляем флаги при входе в узел
+        has_fft = has_fft or node == 'fft'
+        has_dac = has_dac or node == 'dac'
+        
+        if node == 'out':
+            return 1 if (has_fft and has_dac) else 0
+        if node not in net:
+            return 0
+        return sum(count_paths(dep, has_fft, has_dac) for dep in net[node])
+    
+    return count_paths('svr', False, False)
+
 
 assert solve1(test_input, False) == test1_result
 
